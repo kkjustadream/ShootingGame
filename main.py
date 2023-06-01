@@ -17,6 +17,15 @@ targets = {1: [10, 5, 3],
            2: [12, 8, 5],
            3: [15, 12, 8, 3]}
 level = 1  # menu is at level 0
+points = 0
+shot = False
+total_shot = 0
+# 0: freeplay, 1: accuracy, 2: time
+mode = 0
+ammo = 0
+time_passed = 0
+time_remaining = 0
+counter = 1
 
 # put each level image into list
 for i in range(1, 4):
@@ -35,6 +44,20 @@ for i in range(1, 4):
             target_images[i - 1].append(pygame.transform.scale(
                 pygame.image.load(f'assets/targets/{i}/{j}.png'), (120 - (j * 18), 80 - (j * 12))))
 
+def draw_score(points):
+    points_tex = font.render(f"Points: {points}", True, "black")
+    screen.blit(points_tex, (320, 660))
+    shots_text = font.render(f"Total Shots: {total_shot}", True, "black")
+    screen.blit(shots_text, (320, 687))
+    time_text = font.render(f"Time Elapsed: {time_passed}", True, "black")
+    screen.blit(time_text, (320, 714))
+    if mode == 0:
+        mode_text = font.render(f"Freeplay", True, "black")
+    elif mode == 1:
+        mode_text = font.render(f"Ammo Remaining: {ammo}", True, "black")
+    else:
+        mode_text = font.render(f"Time Remaining: {time_remaining}", True, "black")
+    screen.blit(mode_text, (320, 741))
 
 def draw_gun():
     """
@@ -103,7 +126,16 @@ def move_level(coords):
                 coords[i][j] = (cur_coord[0] - 2 ** i, cur_coord[1])
     return coords
 
-
+def check_shot(targets, coords, points):
+    # get the mouse position
+    mouse_pos = pygame.mouse.get_pos()
+    for i in range(len(targets)):
+        for j in range(len(targets[i])):
+            if targets[i][j].collidepoint(mouse_pos):
+                coords[i].pop(j)
+                points += 10 + 10 * (i ** 2)
+                # add sounds ofr enemy hit
+    return coords, points
 
 # initialize enemy coordinates, according to the number of targets
 one_coords = [[], [], []]
@@ -126,6 +158,14 @@ run = True
 while run:
     # if no tick, the game will run as fast as possible
     timer.tick(fps)
+    if level != 0:
+        if counter < 60:
+            counter += 1
+        else:
+            counter = 1
+            time_passed += 1
+            if mode == 2:
+                time_remaining -= 1
 
     screen.fill("black")
     screen.blit(backgrounds[level - 1], (0, 0))
@@ -134,20 +174,43 @@ while run:
     if level == 1:
         target_boxes = draw_level(one_coords)
         one_coords = move_level(one_coords)
+        if shot:
+            one_coords, points = check_shot(target_boxes, one_coords, points)
+            shot = False
     elif level == 2:
         target_boxes = draw_level(two_coords)
         two_coords = move_level(two_coords)
+        if shot:
+            two_coords, points = check_shot(target_boxes, two_coords, points)
+            shot = False
     elif level == 3:
         target_boxes = draw_level(three_coords)
         three_coords = move_level(three_coords)
+        if shot:
+            three_coords, points = check_shot(target_boxes, three_coords, points)
+            shot = False
 
     if level > 0:
         draw_gun()
+        draw_score(points)
 
     # check quit event
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             run = False
+        # if the mouse is clicked, and the left button is pressed
+        if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            mouse_position = pygame.mouse.get_pos()
+            if (0 < mouse_position[0] < WIDTH) and (0 < mouse_position[1] < HEIGHT - 200):
+                shot = True
+                total_shot += 1
+                if mode == 1:
+                    ammo -= 1
+
+    if level > 0:
+        if target_boxes == [[], [], []] and level < 3:
+            level += 1
+
     # flip is update the entire display surface at once
     pygame.display.flip()
 
